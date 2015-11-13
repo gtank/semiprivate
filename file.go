@@ -157,7 +157,7 @@ func (m *MutableFile) Read(p []byte) (n int, err error) {
 	}
 
 	if !ok {
-		return 0, errors.New("semiprivate: invalid signature on file")
+		return 0, rsa.ErrVerification
 	}
 
 	// TODO don't repeat this file read
