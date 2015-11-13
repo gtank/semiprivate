@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	DigestSize       = sha256.Size // 32-byte digests
-	SymmetricKeySize = 16          // 128-bit AES keys
+	DigestSize        = sha256.Size // 32-byte digests
+	SymmetricKeySize  = 16          // 128-bit AES keys
+	AsymmetricKeySize = 2048        // 2048-bit RSA keys
 )
 
 func sha256d(data []byte) [DigestSize]byte {

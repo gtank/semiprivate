@@ -9,9 +9,8 @@ import (
 )
 
 const (
-	AsymmetricKeySize = 2048 // 2048-bit RSA keys
-	TagWKFromSK       = "tag_wk_from_sk_v1"
-	TagRKFromWK       = "tag_rk_from_wk_v1"
+	TagWKFromSK = "tag_wk_from_sk_v1"
+	TagRKFromWK = "tag_rk_from_wk_v1"
 )
 
 var (

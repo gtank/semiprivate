@@ -39,7 +39,7 @@ var fileTests = []struct {
 	},
 }
 
-func TestMutableFileWrite(t *testing.T) {
+func TestMutableWriteAndVerify(t *testing.T) {
 	for _, tt := range fileTests {
 		capset, err := NewCapSet()
 		if err != nil {
@@ -57,6 +57,11 @@ func TestMutableFileWrite(t *testing.T) {
 		}
 		if n != tt.expectedSize {
 			t.Errorf("wrote %d bytes, expected %d", n, tt.expectedSize)
+		}
+
+		ok, err := mf.Verify()
+		if !ok || err != nil {
+			t.Errorf("could not verify written file, %s", err)
 		}
 
 		os.Remove(path.Join(mf.storageDir, mf.filename))

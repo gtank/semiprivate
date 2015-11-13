@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io/ioutil"
 	"os"
 	"path"
 )
@@ -33,6 +34,7 @@ func generateSalt() ([]byte, error) {
 
 // NewMutableFile takes a set of capabilities with file contents and generates
 // metadata necessary to manipulate the file.
+// TODO requiring contents here is strange. Should be a problem for Write().
 func NewMutableFile(c *CapSet, storageDir string, contents []byte) (*MutableFile, error) {
 	contentHash := taggedHash(TagAddressableFilename, contents)
 	filename := hex.EncodeToString(contentHash[:])
@@ -46,6 +48,21 @@ func NewMutableFile(c *CapSet, storageDir string, contents []byte) (*MutableFile
 		filename:   filename,
 		salt:       salt,
 		contents:   contents,
+		storageDir: storageDir,
+	}, nil
+}
+
+// ExistingMutableFile takes a set of capabilties and checks that that file
+// exists before returning a *MutableFile.
+func ExistingMutableFile(c *CapSet, storageDir, filename string) (*MutableFile, error) {
+	filePath := path.Join(storageDir, filename)
+	if _, err := os.Open(filePath); err != nil {
+		return nil, err
+	}
+
+	return &MutableFile{
+		Cap:        c,
+		filename:   filename,
 		storageDir: storageDir,
 	}, nil
 }
@@ -92,6 +109,7 @@ func (m *MutableFile) Write(data []byte) (n int, err error) {
 	ciphertext := buf[SaltSize:]
 	gcm.Seal(ciphertext, nonce, m.contents, nil)
 
+	// remember that this is hashing all of salt|nonce|ciphertext|tag
 	hashed := sha256.Sum256(buf)
 	sig, err := rsa.SignPKCS1v15(rand.Reader, m.Cap.sk, crypto.SHA256, hashed[:])
 	if err != nil {
@@ -115,5 +133,40 @@ func (m *MutableFile) Write(data []byte) (n int, err error) {
 	return bufN + sigN, nil
 }
 
-// func (mf *MutableFile) Read(p []byte) (n int, err error) {}
-// func (mf *MutableFile) Verify(cap []byte) error           {}
+// func (m *MutableFile) Read(p []byte) (n int, err error) {}
+
+// Verify checks that the given file and its key derivation salt are unaltered.
+func (m *MutableFile) Verify() (bool, error) {
+	if m.Cap.vk == nil {
+		return false, CapabilityError
+	}
+
+	if _, ok := m.Cap.vk.(*rsa.PublicKey); !ok {
+		return false, errors.New("semiprivate: VK is not an RSA pubkey")
+	}
+
+	filePath := path.Join(m.storageDir, m.filename)
+	rawFile, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return false, err
+	}
+
+	// TODO: marshaling scheme should scare me less
+	sigSize := AsymmetricKeySize / 8
+	sigOffset := len(rawFile) - sigSize
+	signature := rawFile[sigOffset : sigOffset+sigSize]
+
+	// for generating EK from RK
+	// fileSalt := rawFile[:SaltSize]
+
+	// remember this is hashing all of salt|nonce|ciphertext|tag
+	ciphertext := rawFile[:sigOffset]
+	hashed := sha256.Sum256(ciphertext)
+
+	err = rsa.VerifyPKCS1v15(m.Cap.vk.(*rsa.PublicKey), crypto.SHA256, hashed[:], signature)
+	if err == nil {
+		return true, nil
+	} else {
+		return false, err
+	}
+}
