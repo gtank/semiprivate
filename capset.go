@@ -44,6 +44,7 @@ func NewCapSet() (*CapSet, error) {
 	return newCaps, nil
 }
 
+// VerifyCap derives a verify capability from an existing CapSet.
 func (c *CapSet) VerifyCap() (*CapSet, error) {
 	if c.vk == nil {
 		return nil, CapabilityError
@@ -57,6 +58,7 @@ func (c *CapSet) VerifyCap() (*CapSet, error) {
 	}, nil
 }
 
+// ReadCap derives a read-only capability from an existing CapSet.
 func (c *CapSet) ReadCap() (*CapSet, error) {
 	if c.vk == nil || c.rk == nil {
 		return nil, CapabilityError
@@ -70,6 +72,7 @@ func (c *CapSet) ReadCap() (*CapSet, error) {
 	}, nil
 }
 
+// ReadWriteCap derives a read-write capability from an existing CapSet.
 func (c *CapSet) ReadWriteCap() (*CapSet, error) {
 	// TODO: store keys on disk and use the original hash caps
 	if c.wk == nil || c.rk == nil || c.sk == nil || c.vk == nil {
