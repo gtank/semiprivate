@@ -1,3 +1,17 @@
+// Copyright 2015 George Tankersley
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package semiprivate
 
 import (
@@ -68,9 +82,9 @@ func ExistingMutableFile(c *CapSet, storageDir, filename string) (*MutableFile, 
 // Write writes a file. Format is
 // {
 //   fileSalt [16]byte
-//   gcmNonce [16]byte
+//   gcmNonce [12]byte
 //   ciphertext [len(contents)]byte
-//   gcmTag [12]byte
+//   gcmTag [16]byte
 //   signature [256]byte
 // }
 func (m *MutableFile) Write(data []byte) (n int, err error) {
