@@ -2,6 +2,8 @@ package semiprivate
 
 import (
 	"encoding/hex"
+	"os"
+	"path"
 	"testing"
 )
 
@@ -25,8 +27,38 @@ func TestSHA256d(t *testing.T) {
 	}
 }
 
-//This is a complicated key hierarchy, fully described in lafs.pdf.
-// H is SHA256d
-// RSA keypair, private half denoted SK
-//
-func TestMutableFile(t *testing.T) {}
+var fileTests = []struct {
+	filename     string
+	contents     []byte
+	expectedSize int
+}{
+	{
+		filename:     "abcdef0123456789",
+		contents:     []byte("Hello, world\n"),
+		expectedSize: 313,
+	},
+}
+
+func TestMutableFileWrite(t *testing.T) {
+	for _, tt := range fileTests {
+		capset, err := NewCapSet()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mf, err := NewMutableFile(capset, "/tmp", tt.contents)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		n, err := mf.Write(tt.contents)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n != tt.expectedSize {
+			t.Errorf("wrote %d bytes, expected %d", n, tt.expectedSize)
+		}
+
+		os.Remove(path.Join(mf.storageDir, mf.filename))
+	}
+}
