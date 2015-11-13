@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -177,16 +178,15 @@ func (m *MutableFile) Read(p []byte) (n int, err error) {
 	// skip salt and nonce, get ciphertext|tag, stop before sig
 	ciphertext := rawFile[SaltSize+gcm.NonceSize() : sigOffset]
 
-	// decrypt in place
 	decryptBytes, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return 0, nil
 	}
 
 	if cap(p) < len(decryptBytes) {
-		return copy(p, decryptBytes[:cap(p)]), nil
+		return copy(p, decryptBytes[:cap(p)]), io.ErrShortBuffer
 	} else {
-		return copy(p, decryptBytes), nil
+		return copy(p, decryptBytes), io.EOF
 	}
 }
 

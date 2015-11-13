@@ -1,7 +1,10 @@
 package semiprivate
 
 import (
+	"bytes"
 	"encoding/hex"
+	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -50,6 +53,7 @@ func TestMutableFileOps(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer os.Remove(path.Join(mf.storageDir, mf.filename))
 
 		n, err := mf.Write(tt.contents)
 		if err != nil {
@@ -64,12 +68,16 @@ func TestMutableFileOps(t *testing.T) {
 			t.Errorf("could not verify written file, %s", err)
 		}
 
-		decrypt := make([]byte, 6)
-		mf.Read(decrypt)
-		if string(decrypt) != "Hello," {
+		shortRead := make([]byte, len(tt.contents)-1)
+		n, err = mf.Read(shortRead)
+		if (err != io.ErrShortBuffer) && (bytes.Compare(shortRead, tt.contents[:len(shortRead)]) != 0) {
 			t.Error("short read failed")
 		}
 
-		os.Remove(path.Join(mf.storageDir, mf.filename))
+		fullRead, err := ioutil.ReadAll(mf)
+		if bytes.Compare(fullRead, tt.contents) != 0 {
+			t.Error("full read failed")
+		}
+
 	}
 }
