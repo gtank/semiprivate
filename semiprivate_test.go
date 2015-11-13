@@ -81,3 +81,22 @@ func TestMutableFileOps(t *testing.T) {
 
 	}
 }
+
+func TestDropWriteCap(t *testing.T) {
+	for _, tt := range fileTests {
+		capset, err := NewCapSet()
+		if err != nil {
+			t.Fatal(err)
+		}
+		capset, err = capset.ReadCap()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		m, err := NewMutableFile(capset, "/tmp")
+		_, err = m.Write(tt.contents)
+		if err != CapabilityError {
+			t.Fatal("did not detect dropped writecap")
+		}
+	}
+}
