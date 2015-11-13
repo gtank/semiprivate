@@ -96,18 +96,17 @@ func (m *MutableFile) Write(data []byte) (n int, err error) {
 		return 0, err
 	}
 
-	buf := make([]byte, len(m.salt)+len(m.contents)+gcm.NonceSize()+gcm.Overhead())
+	buf := make([]byte, len(m.salt))
 	copy(buf, m.salt)
-	nonce := buf[SaltSize : SaltSize+gcm.NonceSize()]
-	if len(nonce) != gcm.NonceSize() {
-		return 0, errors.New("you did the slicing wrong")
-	}
-	_, err = rand.Read(nonce)
-	if err != nil {
+
+	nonce := make([]byte, gcm.NonceSize())
+	n, err = rand.Read(nonce)
+	if n != gcm.NonceSize() || err != nil {
 		panic("rand.Read failed!1!!")
 	}
-	ciphertext := buf[SaltSize:]
-	gcm.Seal(ciphertext, nonce, m.contents, nil)
+	buf = append(buf, nonce...)
+
+	buf = gcm.Seal(buf, nonce, m.contents, nil)
 
 	// remember that this is hashing all of salt|nonce|ciphertext|tag
 	hashed := sha256.Sum256(buf)
@@ -133,7 +132,66 @@ func (m *MutableFile) Write(data []byte) (n int, err error) {
 	return bufN + sigN, nil
 }
 
-// func (m *MutableFile) Read(p []byte) (n int, err error) {}
+// Read checks the validity of a file and attempts to decrypt it.
+func (m *MutableFile) Read(p []byte) (n int, err error) {
+	// delegate VK checking to Verify()
+	if m.Cap.rk == nil {
+		return 0, CapabilityError
+	}
+
+	ok, err := m.Verify()
+	if err != nil {
+		return 0, err
+	}
+
+	if !ok {
+		return 0, errors.New("semiprivate: invalid signature on file")
+	}
+
+	// TODO don't repeat this file read
+	filePath := path.Join(m.storageDir, m.filename)
+	rawFile, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return 0, err
+	}
+
+	sigSize := AsymmetricKeySize / 8
+	sigOffset := len(rawFile) - sigSize
+
+	// for generating EK from RK
+	fileSalt := rawFile[:SaltSize]
+	ek := truncHash(TagEKFromSaltRK, append(m.Cap.rk, fileSalt...), SymmetricKeySize)
+	if ek == nil || len(ek) != SymmetricKeySize {
+		return 0, aes.KeySizeError(len(ek))
+	}
+
+	block, err := aes.NewCipher(ek)
+	if err != nil {
+		return 0, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return 0, err
+	}
+
+	// skip salt, get nonce, stop before ciphertext
+	nonce := rawFile[SaltSize : SaltSize+gcm.NonceSize()]
+
+	// skip salt and nonce, get ciphertext|tag, stop before sig
+	ciphertext := rawFile[SaltSize+gcm.NonceSize() : sigOffset]
+
+	// decrypt in place
+	decryptBytes, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return 0, nil
+	}
+
+	if cap(p) < len(decryptBytes) {
+		return copy(p, decryptBytes[:cap(p)]), nil
+	} else {
+		return copy(p, decryptBytes), nil
+	}
+}
 
 // Verify checks that the given file and its key derivation salt are unaltered.
 func (m *MutableFile) Verify() (bool, error) {
@@ -160,8 +218,8 @@ func (m *MutableFile) Verify() (bool, error) {
 	// fileSalt := rawFile[:SaltSize]
 
 	// remember this is hashing all of salt|nonce|ciphertext|tag
-	ciphertext := rawFile[:sigOffset]
-	hashed := sha256.Sum256(ciphertext)
+	hashData := rawFile[:sigOffset]
+	hashed := sha256.Sum256(hashData)
 
 	err = rsa.VerifyPKCS1v15(m.Cap.vk.(*rsa.PublicKey), crypto.SHA256, hashed[:], signature)
 	if err == nil {

@@ -39,7 +39,7 @@ var fileTests = []struct {
 	},
 }
 
-func TestMutableWriteAndVerify(t *testing.T) {
+func TestMutableFileOps(t *testing.T) {
 	for _, tt := range fileTests {
 		capset, err := NewCapSet()
 		if err != nil {
@@ -62,6 +62,12 @@ func TestMutableWriteAndVerify(t *testing.T) {
 		ok, err := mf.Verify()
 		if !ok || err != nil {
 			t.Errorf("could not verify written file, %s", err)
+		}
+
+		decrypt := make([]byte, 6)
+		mf.Read(decrypt)
+		if string(decrypt) != "Hello," {
+			t.Error("short read failed")
 		}
 
 		os.Remove(path.Join(mf.storageDir, mf.filename))
