@@ -15,15 +15,13 @@ import (
 )
 
 const (
-	SaltSize               = 16 // 128-bit salt
-	TagEKFromSaltRK        = "tag_ek_from_salt_rk_v1"
-	TagAddressableFilename = "tag_hash_filename_v1"
+	SaltSize        = 16 // 128-bit salt
+	TagEKFromSaltRK = "tag_ek_from_salt_rk_v1"
 )
 
 type MutableFile struct {
 	Cap        *CapSet
 	storageDir string
-	contents   []byte
 	filename   string
 	salt       []byte
 }
@@ -34,10 +32,10 @@ func generateSalt() ([]byte, error) {
 
 // NewMutableFile takes a set of capabilities with file contents and generates
 // metadata necessary to manipulate the file.
-// TODO requiring contents here is strange. Should be a problem for Write().
-func NewMutableFile(c *CapSet, storageDir string, contents []byte) (*MutableFile, error) {
-	contentHash := taggedHash(TagAddressableFilename, contents)
-	filename := hex.EncodeToString(contentHash[:])
+func NewMutableFile(c *CapSet, storageDir string) (*MutableFile, error) {
+	randName := make([]byte, 16)
+	rand.Read(randName)
+	filename := hex.EncodeToString(randName)
 	salt, err := generateSalt()
 	if err != nil {
 		panic("rand.Read failed!1!!")
@@ -47,7 +45,6 @@ func NewMutableFile(c *CapSet, storageDir string, contents []byte) (*MutableFile
 		Cap:        c,
 		filename:   filename,
 		salt:       salt,
-		contents:   contents,
 		storageDir: storageDir,
 	}, nil
 }
@@ -106,7 +103,7 @@ func (m *MutableFile) Write(data []byte) (n int, err error) {
 	}
 	buf = append(buf, nonce...)
 
-	buf = gcm.Seal(buf, nonce, m.contents, nil)
+	buf = gcm.Seal(buf, nonce, data, nil)
 
 	// remember that this is hashing all of salt|nonce|ciphertext|tag
 	hashed := sha256.Sum256(buf)

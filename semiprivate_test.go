@@ -46,7 +46,7 @@ func TestMutableFileOps(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		mf, err := NewMutableFile(capset, "/tmp", tt.contents)
+		mf, err := NewMutableFile(capset, "/tmp")
 		if err != nil {
 			t.Fatal(err)
 		}
